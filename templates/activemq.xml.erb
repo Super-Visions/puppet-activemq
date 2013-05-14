@@ -1,0 +1,94 @@
+<beans
+  xmlns="http://www.springframework.org/schema/beans"
+  xmlns:amq="http://activemq.apache.org/schema/core"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.0.xsd
+  http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd
+  http://activemq.apache.org/camel/schema/spring http://activemq.apache.org/camel/schema/spring/camel-spring.xsd">
+
+    <broker xmlns="http://activemq.apache.org/schema/core" brokerName="localhost" useJmx="true">
+        <destinationPolicy>
+          <policyMap>
+            <policyEntries>
+              <policyEntry topic=">" producerFlowControl="false"/>
+              <policyEntry queue="*.reply.>" gcInactiveDestinations="true" inactiveTimoutBeforeGC="300000" />
+            </policyEntries>
+          </policyMap>
+        </destinationPolicy>
+
+        <managementContext>
+            <managementContext createConnector="false"/>
+        </managementContext>
+
+        <plugins>
+          <statisticsBrokerPlugin/>
+          <simpleAuthenticationPlugin>
+            <users>
+              <authenticationUser username="<%= scope.lookupvar('::activemq::admin_user') %>" password="<%= scope.lookupvar('::activemq::admin_pass') %>" groups="admins,everyone<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %><% end %>"/>
+              <authenticationUser username="<%= scope.lookupvar('::activemq::main_user') %>" password="<%= scope.lookupvar('::activemq::main_pass') %>" groups="<%= scope.lookupvar('::activemq::main_user') %>,everyone<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_clnt_g<% end %>"/>
+
+<% scope.lookupvar('::activemq::users').each do |user| -%>
+              <authenticationUser username="<%= user['name'] %>_srvr" password="<%= user['pass'] %>_srvr" groups="<%= user['name'] %>_srvr_g,everyone"/>
+              <authenticationUser username="<%= user['name'] %>" password="<%= user['pass'] %>" groups="<%= user['name'] %>_clnt_g,everyone"/>
+
+<% end -%>
+            </users>
+          </simpleAuthenticationPlugin>
+          <authorizationPlugin>
+            <map>
+              <authorizationMap>
+                <authorizationEntries>
+                  <authorizationEntry topic="ActiveMQ.Advisory.>" write="everyone" read="everyone" admin="everyone"  />
+                  <authorizationEntry queue=">" write="admins" read="admins" admin="admins"  />
+                  <authorizationEntry topic=">" write="admins" read="admins" admin="admins"  />
+
+                  <authorizationEntry topic="<%= scope.lookupvar('::activemq::main_user') %>.>" write="<%= scope.lookupvar('::activemq::main_user') %>" read="<%= scope.lookupvar('::activemq::main_user') %>" admin="<%= scope.lookupvar('::activemq::main_user') %>"  />
+                  <authorizationEntry queue="<%= scope.lookupvar('::activemq::main_user') %>.>" write="<%= scope.lookupvar('::activemq::main_user') %>" read="<%= scope.lookupvar('::activemq::main_user') %>" admin="<%= scope.lookupvar('::activemq::main_user') %>"  />
+
+<% scope.lookupvar('::activemq::users').each do |user| -%>                  
+                  <authorizationEntry topic="<%= user['name'] %>.>" write="<%= scope.lookupvar('::activemq::main_user') %>" read="<%= scope.lookupvar('::activemq::main_user') %>" admin="<%= scope.lookupvar('::activemq::main_user') %>"  />
+                  <authorizationEntry queue="<%= user['name'] %>.>" write="<%= scope.lookupvar('::activemq::main_user') %>" read="<%= scope.lookupvar('::activemq::main_user') %>" admin="<%= scope.lookupvar('::activemq::main_user') %>"  />
+
+<% end -%>
+                  <authorizationEntry topic="<%= scope.lookupvar('::activemq::main_user') %>.registration.command" read="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>"  />
+                  <authorizationEntry queue="<%= scope.lookupvar('::activemq::main_user') %>.reply.>" write="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>" admin="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>"  />
+                  <authorizationEntry topic="<%= scope.lookupvar('::activemq::main_user') %>.*.agent" read="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>" admin="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>"  />
+                  <authorizationEntry topic="<%= scope.lookupvar('::activemq::main_user') %>.*.command" read="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>" admin="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>"  />
+                  <authorizationEntry topic="<%= scope.lookupvar('::activemq::main_user') %>.*.reply" write="<% scope.lookupvar('::activemq::users').each do |user| %>,<%= user['name'] %>_srvr_g<% end %>"  />
+
+<% scope.lookupvar('::activemq::users').each do |user| -%>                  
+                  <authorizationEntry topic="<%= user['name'] %>.registration.command" write="<%= user['name'] %>_srvr_g" read="<%= user['name'] %>_srvr_g" admin="<%= user['name'] %>_srvr_g"  />
+                  <authorizationEntry topic="<%= user['name'] %>.registration.agent" write="<%= user['name'] %>_srvr_g" admin="<%= user['name'] %>_srvr_g"  />
+                  <authorizationEntry queue="<%= user['name'] %>.reply.>" write="<%= user['name'] %>_srvr_g" read="<%= user['name'] %>_clnt_g" admin="<%= user['name'] %>_srvr_g,<%= user['name'] %>_clnt_g"  />
+                  <authorizationEntry topic="<%= user['name'] %>.*.agent" write="<%= user['name'] %>_clnt_g" read="<%= user['name'] %>_srvr_g" admin="<%= user['name'] %>_srvr_g"  />
+                  <authorizationEntry topic="<%= user['name'] %>.*.command" write="<%= user['name'] %>_clnt_g" read="<%= user['name'] %>_srvr_g" admin="<%= user['name'] %>_srvr_g"  />
+                  <authorizationEntry topic="<%= user['name'] %>.*.reply" write="<%= user['name'] %>_clnt_g" read="<%= user['name'] %>_clnt_g" admin="<%= user['name'] %>_srvr_g,<%= user['name'] %>_clnt_g"  />
+<% end -%>
+
+                </authorizationEntries>
+              </authorizationMap>
+            </map>
+          </authorizationPlugin>
+        </plugins>
+
+        <systemUsage>
+            <systemUsage>
+                <memoryUsage>
+                    <memoryUsage limit="20 mb"/>
+                </memoryUsage>
+                <storeUsage>
+                    <storeUsage limit="1 gb" name="foo"/>
+                </storeUsage>
+                <tempUsage>
+                    <tempUsage limit="100 mb"/>
+                </tempUsage>
+            </systemUsage>
+        </systemUsage>
+
+        <transportConnectors>
+            <transportConnector name="openwire" uri="tcp://0.0.0.0:61616"/>
+            <transportConnector name="stomp" uri="stomp://0.0.0.0:61613"/>
+        </transportConnectors>
+    </broker>
+</beans>
+
